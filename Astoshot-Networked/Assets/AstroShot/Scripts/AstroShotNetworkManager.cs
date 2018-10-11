@@ -11,7 +11,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
     public static AstroShotNetworkManager Current { get; private set; }
 
     [SerializeField]
-    HostTopology _hostTopology;
+    EP2PSend[] _channels;
 
     Dictionary<CSteamID, SteamPlayer> _steamPlayers;
     HashSet<CSteamID> _connectedPlayers;
@@ -21,15 +21,20 @@ public class AstroShotNetworkManager : MonoBehaviour {
     Callback<P2PSessionRequest_t> _steamInviteCallback;
     Callback<LobbyCreated_t> _lobbyCreated;
     Callback<LobbyEnter_t> _lobbyEntered;
-    Callback<LobbyDataUpdate_t> _lobbyDataUpdate;
+    //Callback<LobbyDataUpdate_t> _lobbyDataUpdate;
     Callback<GameLobbyJoinRequested_t> _gameLobbyJoinRequested;
     Callback<LobbyChatUpdate_t> _lobbyChatUpdate;
     Callback<P2PSessionRequest_t> _P2PSessionRequested;
     CallResult<LobbyMatchList_t> _lobbyMatchList;
 
-    string[] _lobbyList = new string[0];
+    LobbyData[] _lobbyList = new LobbyData[0];
 
     #region Properties
+    public EP2PSend[] Channels {
+        get { return _channels; }
+        set { _channels = value; }
+    }
+
     public CSteamID SteamLobbyId {
         get { return _steamLobbyId; }
         set { _steamLobbyId = value; }
@@ -55,7 +60,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
         _steamInviteCallback = Callback<P2PSessionRequest_t>.Create(Steam_InviteCallback);
         _lobbyCreated = Callback<LobbyCreated_t>.Create(Steam_OnLobbyCreated);
         _lobbyEntered = Callback<LobbyEnter_t>.Create(Steam_OnLobbyEntered);
-        _lobbyDataUpdate = Callback<LobbyDataUpdate_t>.Create(Steam_OnLobbyDataUpdate);
+        //_lobbyDataUpdate = Callback<LobbyDataUpdate_t>.Create(Steam_OnLobbyDataUpdate);
         _gameLobbyJoinRequested = Callback<GameLobbyJoinRequested_t>.Create(Steam_OnGameLobbyJoinRequested);
         _lobbyChatUpdate = Callback<LobbyChatUpdate_t>.Create(Steam_ChatUpdate);
         _P2PSessionRequested = Callback<P2PSessionRequest_t>.Create(Steam_OnP2PSessionRequested);
@@ -87,7 +92,17 @@ public class AstroShotNetworkManager : MonoBehaviour {
         GUILayout.BeginVertical();
         {
             for(int i = 0; i < _lobbyList.Length; i++) {
-                GUILayout.Label("Match: " + _lobbyList[i]);
+                var lobbyData = _lobbyList[i];
+
+                GUILayout.BeginVertical();
+                {
+                    GUILayout.Label(string.Format("Match ({1}/{2}): {0}", lobbyData.label, SteamMatchmaking.GetNumLobbyMembers(lobbyData.lobbyId), SteamMatchmaking.GetLobbyMemberLimit(lobbyData.lobbyId)));
+
+                    if(!_steamLobbyId.IsValid())
+                        if(GUILayout.Button("Join"))
+                            JoinLobby(lobbyData.lobbyId);
+                }
+                GUILayout.EndVertical();
             }
         }
         GUILayout.EndVertical();
@@ -105,13 +120,17 @@ public class AstroShotNetworkManager : MonoBehaviour {
         _inLobby = false;
     }
 
+    void JoinLobby(CSteamID lobbyId) {
+        SteamMatchmaking.JoinLobby(lobbyId);
+    }
+
     void Update() {
         if(!SteamManager.Initialized) return;
 
         uint packetSize;
-        int channels = _hostTopology.DefaultConfig.ChannelCount;
+        int channelCount = _channels.Length;
 
-        for(int channel = 0; channel < channels; channel++) {
+        for(int channel = 0; channel < channelCount; channel++) {
             while(SteamNetworking.IsP2PPacketAvailable(out packetSize, channel)) {
                 byte[] data = new byte[packetSize];
                 CSteamID senderId;
@@ -199,14 +218,12 @@ public class AstroShotNetworkManager : MonoBehaviour {
     }
 
     void Steam_OnLobbyCreated(LobbyCreated_t callback) {
-        //SteamMatchmaking.SetLobbyData(_steamLobbyId, SteamPchKey, GAME_ID);
-        //SteamMatchmaking.SetLobbyData(_steamLobbyId, "time", DateTime.Now.ToShortDateString());
         Debug.Log("Steam_OnLobbyCreated");
     }
 
-    void Steam_OnLobbyDataUpdate(LobbyDataUpdate_t callback) {
-        Debug.Log("Steam_OnLobbyDataUpdate");
-    }
+    //void Steam_OnLobbyDataUpdate(LobbyDataUpdate_t callback) {
+    //    Debug.Log("Steam_OnLobbyDataUpdate");
+    //}
 
     void Steam_OnLobbyEntered(LobbyEnter_t callback) {
         Debug.Log("Steam_OnLobbyEntered");
@@ -223,19 +240,28 @@ public class AstroShotNetworkManager : MonoBehaviour {
     }
 
     void Steam_OnLobbyMatchList(LobbyMatchList_t callback, bool bIOFailure) {
-        Debug.Log("Steam_OnLobbyMatchList IOFailure:" + bIOFailure);
-        //SteamMatchmaking.
-        _lobbyList = new string[callback.m_nLobbiesMatching];
+        Debug.Log("Steam_OnLobbyMatchList");
+
+        List<LobbyData> list = new List<LobbyData>();
 
         for(int i = 0; i < callback.m_nLobbiesMatching; i++) {
             var steamId = SteamMatchmaking.GetLobbyByIndex(i);
             var data = SteamMatchmaking.GetLobbyData(steamId, SteamPchKey);
-            var time = SteamMatchmaking.GetLobbyData(steamId, "time");
 
-            data += ":" + time;
+            if(data == GAME_ID) {
+                var time = SteamMatchmaking.GetLobbyData(steamId, "time");
+                var ownerId = SteamMatchmaking.GetLobbyOwner(steamId);
 
-            _lobbyList[i] = data;
+                string lobbyData = string.Format("{2}\n{0}:{1}", data, time, SteamFriends.GetFriendPersonaName(ownerId));
+
+                list.Add(new LobbyData() {
+                    label = lobbyData,
+                    lobbyId = steamId
+                });
+            }
         }
+
+        _lobbyList = list.ToArray();
     }
 
     void Steam_OnP2PSessionRequested(P2PSessionRequest_t callback) {
@@ -251,4 +277,9 @@ public class AstroShotNetworkManager : MonoBehaviour {
     //    client.RegisterHandler(MsgType.Connect, OnConnected);
     //    client.RegisterHandler(MsgType.Disconnect, OnDisconnected);
     //}
+
+    struct LobbyData {
+        public string label;
+        public CSteamID lobbyId;
+    }
 }
