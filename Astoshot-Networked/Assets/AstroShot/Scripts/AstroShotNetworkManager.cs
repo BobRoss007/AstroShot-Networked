@@ -56,6 +56,13 @@ public class AstroShotNetworkManager : MonoBehaviour {
         InitializeSteamCallbacks();
     }
 
+    SteamPlayer AddPlayer(CSteamID steamId) {
+        if(_connectedPlayers.Add(steamId))
+            _steamPlayers.Add(steamId, new SteamPlayer(steamId));
+
+        return _steamPlayers[steamId];
+    }
+
     public void InitializeSteamCallbacks() {
         _steamInviteCallback = Callback<P2PSessionRequest_t>.Create(Steam_InviteCallback);
         _lobbyCreated = Callback<LobbyCreated_t>.Create(Steam_OnLobbyCreated);
@@ -142,10 +149,18 @@ public class AstroShotNetworkManager : MonoBehaviour {
                 if(SteamNetworking.ReadP2PPacket(data, packetSize, out packetSize, out senderId, channel)) {
                     P2PSessionState_t sessionState;
 
-                    if(SteamNetworking.GetP2PSessionState(senderId, out sessionState)) {
-                        SteamNetworking.CloseP2PSessionWithUser(senderId);
-                        SteamNetworking.SendP2PPacket(senderId, null, 0, EP2PSend.k_EP2PSendReliable);
+                    var player = _steamPlayers[senderId];
+
+                    if(player == null) {
+                        player = AddPlayer(senderId);
+
+                        if(SteamNetworking.GetP2PSessionState(senderId, out sessionState)) {
+                            SteamNetworking.CloseP2PSessionWithUser(senderId);
+                            SteamNetworking.SendP2PPacket(senderId, null, 0, EP2PSend.k_EP2PSendReliable);
+                        }
                     }
+
+                    player.ReceiveData(data, Convert.ToInt32(packetSize), channel);
                 }
             }
         }
@@ -201,8 +216,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
 
         switch(callback.m_rgfChatMemberStateChange) {
             case (uint)EChatMemberStateChange.k_EChatMemberStateChangeEntered:
-                _connectedPlayers.Add(userId);
-                _steamPlayers.Add(userId, new SteamPlayer(userId));
+                AddPlayer(userId);
                 Debug.LogFormat("Player joined Username:{0}", SteamFriends.GetFriendPersonaName(userId));
 
                 break;
@@ -250,10 +264,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
         _inLobby = true;
         _steamLobbyId = new CSteamID(callback.m_ulSteamIDLobby);
 
-        var steamPlayer = new SteamPlayer(mySteamId);
-
-        _steamPlayers.Add(mySteamId, steamPlayer);
-        _connectedPlayers.Add(mySteamId);
+        var steamPlayer = AddPlayer(mySteamId);
 
         InitializePlayerCallbacks(steamPlayer);
 
