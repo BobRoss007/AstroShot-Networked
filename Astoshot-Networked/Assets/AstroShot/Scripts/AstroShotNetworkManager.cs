@@ -145,6 +145,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
             while(SteamNetworking.IsP2PPacketAvailable(out packetSize, channel)) {
                 byte[] data = new byte[packetSize];
                 CSteamID senderId;
+                Debug.Log("SteamNetworking.IsP2PPacketAvailable");
 
                 if(SteamNetworking.ReadP2PPacket(data, packetSize, out packetSize, out senderId, channel)) {
                     P2PSessionState_t sessionState;
@@ -168,11 +169,12 @@ public class AstroShotNetworkManager : MonoBehaviour {
 
         if(_steamLobbyId.IsValid()) {
             if(Input.GetKeyDown(KeyCode.Space)) {
-                var writer = SteamNetworkWriter.Create(NetMessageType.SendMessageTest);
-                writer.Write(SteamUser.GetSteamID());
-                writer.EndWrite();
+                SendDataToAll(null, 1, true);
+                //var writer = SteamNetworkWriter.Create(NetMessageType.SendMessageTest);
+                //writer.Write(SteamUser.GetSteamID());
+                //writer.EndWrite();
 
-                SendWriterToAll(writer, 1, true);
+                //SendWriterToAll(writer, 1, true);
             }
         }
     }
@@ -329,7 +331,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
 
 
     public static void SendData(byte[] bytes, EP2PSend sendType, int channelId, CSteamID steamId) {
-        SteamNetworking.SendP2PPacket(steamId, bytes, (uint)bytes.Length, sendType, channelId);
+        SteamNetworking.SendP2PPacket(steamId, bytes, bytes == null ? 0 : (uint)bytes.Length, sendType, channelId);
     }
     public static void SendData(byte[] bytes, EP2PSend sendType, int channelId, params CSteamID[] steamIds) {
         for(int i = 0; i < steamIds.Length; i++)
