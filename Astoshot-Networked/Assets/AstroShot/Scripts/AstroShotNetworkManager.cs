@@ -75,6 +75,8 @@ public class AstroShotNetworkManager : MonoBehaviour {
     }
 
     void InitializePlayerCallbacks(SteamPlayer player) {
+        Debug.Log("InitializePlayerCallbacks");
+
         player.RegisterHandler(NetMessageType.SendMessageTest, ReceiveMessageTest);
     }
 

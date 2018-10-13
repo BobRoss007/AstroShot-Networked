@@ -41,7 +41,10 @@ public class SteamPlayer {
     }
 
     public void RegisterHandler(short messageType, SteamNetworkMessageDelegate method) {
-        _registeredHandlers[messageType] = method;
+        if(_registeredHandlers.ContainsKey(messageType))
+            _registeredHandlers[messageType] = method;
+        else
+            _registeredHandlers.Add(messageType, method);
     }
 
     public virtual bool SendData(byte[] bytes, int byteCount, EP2PSend sendType, int channelId, out byte error) {
