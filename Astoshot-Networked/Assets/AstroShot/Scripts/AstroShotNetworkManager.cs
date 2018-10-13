@@ -152,6 +152,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
                     var player = _steamPlayers[senderId];
 
                     if(player == null) {
+                        Debug.Log("Update AddPlayer");
                         player = AddPlayer(senderId);
 
                         if(SteamNetworking.GetP2PSessionState(senderId, out sessionState)) {
