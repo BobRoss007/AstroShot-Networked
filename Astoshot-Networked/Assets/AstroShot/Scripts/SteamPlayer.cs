@@ -34,7 +34,7 @@ public class SteamPlayer {
 
         var message = new SteamNetworkMessage(bytes);
         var messageType = message.MessageType;
-        Debug.Log("messageType=" + message);
+        Debug.Log("messageType=" + messageType);
         if(messageType > -1)
             if(_registeredHandlers.ContainsKey(messageType))
                 _registeredHandlers[messageType](message);
