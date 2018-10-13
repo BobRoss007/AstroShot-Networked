@@ -163,7 +163,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
 
                     SteamPlayer myPlayer;
 
-                    if(_steamPlayers.TryGetValue(SteamUser.GetSteamID(), out myPlayer)) 
+                    if(_steamPlayers.TryGetValue(SteamUser.GetSteamID(), out myPlayer))
                         myPlayer.ReceiveData(data, Convert.ToInt32(packetSize), channel);
                 }
             }
@@ -279,6 +279,16 @@ public class AstroShotNetworkManager : MonoBehaviour {
             var dateTime = DateTime.Now;
 
             SteamMatchmaking.SetLobbyData(_steamLobbyId, "time", dateTime.ToLongDateString() + " - " + dateTime.ToLongTimeString());
+        }
+        else {
+            var memberCount = SteamMatchmaking.GetNumLobbyMembers(_steamLobbyId);
+
+            for(int i = 0; i < memberCount; i++) {
+                var memberId = SteamMatchmaking.GetLobbyMemberByIndex(_steamLobbyId, i);
+
+                if(memberId != mySteamId)
+                    AddPlayer(memberId);
+            }
         }
     }
 
