@@ -26,7 +26,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
     Callback<LobbyChatUpdate_t> _lobbyChatUpdate;
     Callback<P2PSessionRequest_t> _P2PSessionRequested;
     CallResult<LobbyMatchList_t> _lobbyMatchList;
-
+    
     LobbyData[] _lobbyList = new LobbyData[0];
 
     #region Properties
@@ -268,15 +268,44 @@ public class AstroShotNetworkManager : MonoBehaviour {
         Debug.Log("Steam_OnP2PSessionRequested");
     }
 
-    //void RegisterServerHandlers() {
-    //    NetworkServer.RegisterHandler(MsgType.Connect, OnConnected);
-    //    NetworkServer.RegisterHandler(MsgType.Disconnect, OnDisconnected);
-    //}
+    public void SendData(byte[] bytes, int channelId, CSteamID steamId) {
+        SendData(bytes, _channels[channelId], channelId, steamId);
+    }
 
-    //void RegisterClientHandlers(NetworkClient client) {
-    //    client.RegisterHandler(MsgType.Connect, OnConnected);
-    //    client.RegisterHandler(MsgType.Disconnect, OnDisconnected);
-    //}
+    public void SendDataToAll(byte[] bytes, int channelId, bool ignoreSelf = false) {
+        foreach(var player in _connectedPlayers) {
+            if(ignoreSelf && player == SteamUser.GetSteamID()) continue;
+
+            SendData(bytes, _channels[channelId], channelId, player);
+        }
+    }
+
+    public void SendWriter(CSteamID steamId, SteamNetworkWriter writer, byte[] bytes, int channelId) {
+        SendData(writer.ToBytes(), channelId, steamId);
+    }
+
+    public void SendWriterToAll(SteamNetworkWriter writer, int channelId, bool ignoreSelf = false) {
+        SendDataToAll(writer.ToBytes(), channelId, ignoreSelf);
+    }
+
+
+    public static void SendData(byte[] bytes, EP2PSend sendType, int channelId, CSteamID steamId) {
+        SteamNetworking.SendP2PPacket(steamId, bytes, (uint)bytes.Length, sendType, channelId);
+    }
+    public static void SendData(byte[] bytes, EP2PSend sendType, int channelId, params CSteamID[] steamIds) {
+        for(int i = 0; i < steamIds.Length; i++)
+            SendData(bytes, sendType, channelId, steamIds[i]);
+    }
+
+    public static void SendWriter(SteamNetworkWriter writer, EP2PSend sendType, int channelId, CSteamID steamId) {
+        SendData(writer.ToBytes(), sendType, channelId, steamId);
+    }
+    public static void SendWriter(SteamNetworkWriter writer, EP2PSend sendType, int channelId, params CSteamID[] steamIds) {
+        var bytes = writer.ToBytes();
+
+        for(int i = 0; i < steamIds.Length; i++)
+            SendData(bytes, sendType, channelId, steamIds[i]);
+    }
 
     struct LobbyData {
         public string label;
