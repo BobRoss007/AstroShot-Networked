@@ -183,6 +183,27 @@ public class AstroShotNetworkManager : MonoBehaviour {
         Debug.Log("ReceiveMessageTest from");
     }
 
+    public void CreateP2PConnectionWithPeer(CSteamID peerId) {
+        SteamNetworking.SendP2PPacket(peerId, null, 0, EP2PSend.k_EP2PSendReliable);
+
+        AddPlayer(peerId);
+    }
+
+    public bool IsMemberInSteamLobby(CSteamID steamUser) {
+        if(SteamManager.Initialized) {
+            int numMembers = SteamMatchmaking.GetNumLobbyMembers(SteamLobbyId);
+
+            for(int i = 0; i < numMembers; i++) {
+                var member = SteamMatchmaking.GetLobbyMemberByIndex(SteamLobbyId, i);
+
+                if(member.m_SteamID == steamUser.m_SteamID)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
     void OnPlayerConnected() {
 
     }
@@ -286,6 +307,12 @@ public class AstroShotNetworkManager : MonoBehaviour {
 
     void Steam_OnP2PSessionRequested(P2PSessionRequest_t callback) {
         Debug.Log("Steam_OnP2PSessionRequested");
+        var memberId = callback.m_steamIDRemote;
+
+        if(IsMemberInSteamLobby(memberId)) {
+            SteamNetworking.AcceptP2PSessionWithUser(memberId);
+            CreateP2PConnectionWithPeer(memberId);
+        }
     }
 
     public void SendData(byte[] bytes, int channelId, CSteamID steamId) {
