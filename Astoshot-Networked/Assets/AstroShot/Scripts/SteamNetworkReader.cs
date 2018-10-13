@@ -22,7 +22,7 @@ public class SteamNetworkReader {
     #endregion
 
     public SteamNetworkReader(byte[] bytes) {
-        _stream = new MemoryStream();
+        _stream = new MemoryStream(bytes);
         _reader = new BinaryReader(_stream);
         Debug.Log("Data Length = " + _stream.Length);
         _messageType = _reader.ReadInt16();
