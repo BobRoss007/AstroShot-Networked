@@ -27,6 +27,8 @@ public class SteamNetworkReader {
 
         if(_stream.Length >= 2)
             _messageType = _reader.ReadInt16();
+        else
+            _messageType = -1;
     }
 
     ~SteamNetworkReader() {
