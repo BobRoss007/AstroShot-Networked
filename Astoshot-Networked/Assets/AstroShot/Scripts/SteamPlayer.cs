@@ -32,11 +32,11 @@ public class SteamPlayer {
     public virtual void ReceiveData(byte[] bytes, int byteCount, int channelId) {
         Debug.LogFormat("ReceiveData byteCount:{0}", byteCount);
 
-        //var message = new SteamNetworkMessage(bytes);
-        //var messageType = message.MessageType;
+        var message = new SteamNetworkMessage(bytes);
+        var messageType = message.MessageType;
 
-        //if(_registeredHandlers.ContainsKey(messageType))
-        //    _registeredHandlers[messageType](message);
+        if(_registeredHandlers.ContainsKey(messageType))
+            _registeredHandlers[messageType](message);
     }
 
     public void RegisterHandler(short messageType, SteamNetworkMessageDelegate method) {
