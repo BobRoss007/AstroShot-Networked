@@ -26,7 +26,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
     Callback<LobbyChatUpdate_t> _lobbyChatUpdate;
     Callback<P2PSessionRequest_t> _P2PSessionRequested;
     CallResult<LobbyMatchList_t> _lobbyMatchList;
-    
+
     LobbyData[] _lobbyList = new LobbyData[0];
 
     #region Properties
@@ -65,6 +65,10 @@ public class AstroShotNetworkManager : MonoBehaviour {
         _lobbyChatUpdate = Callback<LobbyChatUpdate_t>.Create(Steam_ChatUpdate);
         _P2PSessionRequested = Callback<P2PSessionRequest_t>.Create(Steam_OnP2PSessionRequested);
         _lobbyMatchList = CallResult<LobbyMatchList_t>.Create(Steam_OnLobbyMatchList);
+    }
+
+    void InitializePlayerCallbacks(SteamPlayer player) {
+        player.RegisterHandler(NetMessageType.SendMessageTest, ReceiveMessageTest);
     }
 
     void OnGUI() {
@@ -145,6 +149,20 @@ public class AstroShotNetworkManager : MonoBehaviour {
                 }
             }
         }
+
+        if(_steamLobbyId.IsValid()) {
+            if(Input.GetKeyDown(KeyCode.Space)) {
+                var writer = SteamNetworkWriter.Create(NetMessageType.SendMessageTest);
+                writer.Write(SteamUser.GetSteamID());
+                writer.EndWrite();
+
+                SendWriterToAll(writer, 1, true);
+            }
+        }
+    }
+
+    void ReceiveMessageTest(SteamNetworkMessage message) {
+        Debug.Log("ReceiveMessageTest from");
     }
 
     //public void SendMessage(byte[] bytes, int numBytes, int channelId, out byte error) {
@@ -227,10 +245,19 @@ public class AstroShotNetworkManager : MonoBehaviour {
 
     void Steam_OnLobbyEntered(LobbyEnter_t callback) {
         Debug.Log("Steam_OnLobbyEntered");
+        var mySteamId = SteamUser.GetSteamID();
+
         _inLobby = true;
         _steamLobbyId = new CSteamID(callback.m_ulSteamIDLobby);
 
-        if(SteamUser.GetSteamID() == SteamMatchmaking.GetLobbyOwner((CSteamID)callback.m_ulSteamIDLobby)) {
+        var steamPlayer = new SteamPlayer(mySteamId);
+
+        _steamPlayers.Add(mySteamId, steamPlayer);
+        _connectedPlayers.Add(mySteamId);
+
+        InitializePlayerCallbacks(steamPlayer);
+
+        if(mySteamId == SteamMatchmaking.GetLobbyOwner((CSteamID)callback.m_ulSteamIDLobby)) {
             SteamMatchmaking.SetLobbyData(_steamLobbyId, SteamPchKey, GAME_ID);
 
             var dateTime = DateTime.Now;

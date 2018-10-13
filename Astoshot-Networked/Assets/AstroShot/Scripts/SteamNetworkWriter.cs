@@ -80,4 +80,9 @@ public class SteamNetworkWriter {
     public byte[] ToBytes() {
         return _stream.ToArray();
     }
+
+
+    public static SteamNetworkWriter Create(short messageType) {
+        return new SteamNetworkWriter(messageType);
+    }
 }
