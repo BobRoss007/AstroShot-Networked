@@ -167,14 +167,14 @@ public class AstroShotNetworkManager : MonoBehaviour {
             }
         }
 
-        if(_steamLobbyId.IsValid()) {
+        if(_inLobby) {
             if(Input.GetKeyDown(KeyCode.Space)) {
-                SendDataToAll(null, 1, true);
-                //var writer = SteamNetworkWriter.Create(NetMessageType.SendMessageTest);
-                //writer.Write(SteamUser.GetSteamID());
-                //writer.EndWrite();
+                //SendDataToAll(null, 1, true);
+                var writer = SteamNetworkWriter.Create(NetMessageType.SendMessageTest);
+                writer.Write(SteamUser.GetSteamID());
+                writer.EndWrite();
 
-                //SendWriterToAll(writer, 0, true);
+                SendWriterToAll(writer, 0, true);
             }
         }
     }
