@@ -145,15 +145,12 @@ public class AstroShotNetworkManager : MonoBehaviour {
             while(SteamNetworking.IsP2PPacketAvailable(out packetSize, channel)) {
                 byte[] data = new byte[packetSize];
                 CSteamID senderId;
-                Debug.Log("SteamNetworking.IsP2PPacketAvailable");
 
                 if(SteamNetworking.ReadP2PPacket(data, packetSize, out packetSize, out senderId, channel)) {
                     P2PSessionState_t sessionState;
-
                     SteamPlayer player;
 
                     if(!_steamPlayers.TryGetValue(senderId, out player)) {
-                        Debug.Log("Update AddPlayer");
                         player = AddPlayer(senderId);
 
                         if(SteamNetworking.GetP2PSessionState(senderId, out sessionState)) {
@@ -180,7 +177,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
     }
 
     void ReceiveMessageTest(SteamNetworkMessage message) {
-        Debug.Log("ReceiveMessageTest from");
+        Debug.Log("ReceiveMessageTest");
     }
 
     public void CreateP2PConnectionWithPeer(CSteamID peerId) {
