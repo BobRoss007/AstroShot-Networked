@@ -161,7 +161,10 @@ public class AstroShotNetworkManager : MonoBehaviour {
                         }
                     }
 
-                    player.ReceiveData(data, Convert.ToInt32(packetSize), channel);
+                    SteamPlayer myPlayer;
+
+                    if(_steamPlayers.TryGetValue(SteamUser.GetSteamID(), out myPlayer)) 
+                        myPlayer.ReceiveData(data, Convert.ToInt32(packetSize), channel);
                 }
             }
         }
