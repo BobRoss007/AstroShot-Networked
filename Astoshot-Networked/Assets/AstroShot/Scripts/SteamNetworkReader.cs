@@ -24,6 +24,7 @@ public class SteamNetworkReader {
     public SteamNetworkReader(byte[] bytes) {
         _stream = new MemoryStream();
         _reader = new BinaryReader(_stream);
+        Debug.Log("Data Position = " + _stream.Position);
         _messageType = _reader.ReadInt16();
     }
 
