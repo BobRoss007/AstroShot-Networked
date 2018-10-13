@@ -174,7 +174,7 @@ public class AstroShotNetworkManager : MonoBehaviour {
                 //writer.Write(SteamUser.GetSteamID());
                 //writer.EndWrite();
 
-                //SendWriterToAll(writer, 1, true);
+                //SendWriterToAll(writer, 0, true);
             }
         }
     }
@@ -183,19 +183,6 @@ public class AstroShotNetworkManager : MonoBehaviour {
         Debug.Log("ReceiveMessageTest from");
     }
 
-    //public void SendMessage(byte[] bytes, int numBytes, int channelId, out byte error) {
-    //    error = 0;
-    //}
-
-    //public void Host() {
-
-    //    //RegisterServerHandlers();
-    //}
-
-    //public void Join() {
-    //    //RegisterClientHandlers();
-    //}
-
     void OnPlayerConnected() {
 
     }
@@ -203,14 +190,6 @@ public class AstroShotNetworkManager : MonoBehaviour {
     void OnPlayerDisconnected() {
 
     }
-
-    //void OnServerStarted() {
-
-    //}
-
-    //void OnServerStopped() {
-
-    //}
 
     void Steam_ChatUpdate(LobbyChatUpdate_t callback) {
         Debug.Log("Steam_ChatUpdate");
@@ -331,6 +310,8 @@ public class AstroShotNetworkManager : MonoBehaviour {
 
 
     public static void SendData(byte[] bytes, EP2PSend sendType, int channelId, CSteamID steamId) {
+        Debug.Log("Sending Data To: " + SteamFriends.GetFriendPersonaName(steamId));
+
         SteamNetworking.SendP2PPacket(steamId, bytes, bytes == null ? 0 : (uint)bytes.Length, sendType, channelId);
     }
     public static void SendData(byte[] bytes, EP2PSend sendType, int channelId, params CSteamID[] steamIds) {
