@@ -223,10 +223,15 @@ public class SteamNetworkManager : MonoBehaviour {
 
     void OnPlayerConnected(CSteamID steamId) {
         AddPlayer(steamId);
+        SyncObjectsToNewPlayer(steamId);
     }
 
-    void OnPlayerDisconnected() {
+    void OnPlayerDisconnected(CSteamID steamId) {
+        //List<uint> removeItems = new List<uint>();
 
+        //foreach(var item in _spawnedObjects) {
+        //    if(_spawnedObjects
+        //}
     }
 
     //public bool RegisterSpawnedObject(NetworkObjectId id, GameObject gameObject) {
