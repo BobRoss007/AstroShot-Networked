@@ -145,6 +145,7 @@ public class SteamNetworkManager : MonoBehaviour {
     void InitializePlayerCallbacks(SteamPlayer player) {
         Debug.Log("InitializePlayerCallbacks");
 
+        player.RegisterHandler(NetMessageType.Spawn, SpawnMessageInternal);
         //player.RegisterHandler(NetMessageType.SendMessageTest, ReceiveMessageTest);
     }
 
