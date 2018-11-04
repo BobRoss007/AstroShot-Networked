@@ -358,6 +358,10 @@ public class SteamNetworkManager : MonoBehaviour {
             _connectedPlayers.Clear();
             _inLobby = false;
         }
+        else {
+            _steamPlayers.Remove(steamId);
+            _connectedPlayers.Remove(steamId);
+        }
     }
 
     static void OwnerMessageInternal(SteamNetworkMessage message) {
@@ -588,9 +592,13 @@ public class SteamNetworkManager : MonoBehaviour {
             UnspawnInternal(id);
         }
         else {
+            Debug.LogFormat("Reading {0}", "prefabId");
             var prefabId = message.NetworkReader.Reader.ReadString();
+            Debug.LogFormat("Reading {0}", "ownerId");
             var ownerId = message.NetworkReader.ReadSteamID();
+            Debug.LogFormat("Reading {0}", "position");
             var position = message.NetworkReader.ReadVector3();
+            Debug.LogFormat("Reading {0}", "rotation");
             var rotation = message.NetworkReader.ReadQuaternion();
 
             SpawnInternal(prefabId, id, ownerId, position, rotation);
