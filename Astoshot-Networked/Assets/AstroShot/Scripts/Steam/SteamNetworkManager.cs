@@ -554,6 +554,7 @@ public class SteamNetworkManager : MonoBehaviour {
                 writer.EndWrite();
 
                 SendWriterToAll(writer, 0, true);
+                Debug.Log("Spawn Message length = " + writer.ToBytes().Length);
             }
         }
         else {
@@ -583,6 +584,8 @@ public class SteamNetworkManager : MonoBehaviour {
     }
 
     static void SpawnMessageInternal(SteamNetworkMessage message) {
+        Debug.Log("Receive Spawn Message length = " + message.NetworkReader.Reader.BaseStream.Length);
+
         var spawnType = message.NetworkReader.Reader.ReadBoolean();
         var id = message.NetworkReader.ReadNetworkID();
 
