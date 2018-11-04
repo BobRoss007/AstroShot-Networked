@@ -337,7 +337,9 @@ public class SteamNetworkManager : MonoBehaviour {
         AddPlayer(steamId);
         if(!isMe) SendReady(steamId);
 
-        if(_connectedPlayers.Count > 1)
+        var playerCount = SteamMatchmaking.GetNumLobbyMembers(SteamLobbyId);
+
+        if(playerCount > 1)
             SyncObjectsToNewPlayer(steamId);
         else
             SetPlayerReady(MyPlayer.SteamId, true);
@@ -591,13 +593,9 @@ public class SteamNetworkManager : MonoBehaviour {
         }
         else {
             var prefabId = message.NetworkReader.Reader.ReadString();
-            Debug.LogFormat("Read {0}:{1}", "prefabId", prefabId);
             var ownerId = message.NetworkReader.ReadSteamID();
-            Debug.LogFormat("Read {0}:{1}", "ownerId", ownerId);
             var position = message.NetworkReader.ReadVector3();
-            Debug.LogFormat("Read {0}:{1}", "position", position);
             var rotation = message.NetworkReader.ReadQuaternion();
-            Debug.LogFormat("Read {0}:{1}", "rotation", rotation);
 
             SpawnInternal(prefabId, id, ownerId, position, rotation);
         }
