@@ -6,8 +6,24 @@ public class SteamPlayer {
 
     Dictionary<short, SteamNetworkMessageDelegate> _registeredHandlers;
     CSteamID _steamId;
+    bool _ready;
+    bool _receivedObjectSync;
 
     #region Properties
+    public string Name {
+        get { return SteamFriends.GetFriendPersonaName(_steamId); }
+    }
+
+    public bool Ready {
+        get { return _ready; }
+        set { _ready = value; }
+    }
+
+    public bool ReceivedObjectSync {
+        get { return _receivedObjectSync; }
+        set { _receivedObjectSync = value; }
+    }
+
     public Dictionary<short, SteamNetworkMessageDelegate> RegisteredHandlers {
         get { return _registeredHandlers; }
     }
@@ -24,22 +40,19 @@ public class SteamPlayer {
         _registeredHandlers = new Dictionary<short, SteamNetworkMessageDelegate>();
     }
 
-
     public void ClearHandlers() {
         _registeredHandlers.Clear();
     }
 
-    public virtual void ReceiveData(byte[] bytes, int byteCount, int channelId) {
-        Debug.LogFormat("ReceiveData byteCount:{0}", byteCount);
-
+    public virtual void ReceiveData(CSteamID senderId, byte[] bytes, int byteCount, int channelId) {
         var message = new SteamNetworkMessage(bytes);
         var messageType = message.MessageType;
-        Debug.Log("messageType=" + messageType);
+
+        message.SenderId = senderId;
+
         if(messageType > -1)
-            if(_registeredHandlers.ContainsKey(messageType)) {
-                Debug.Log("_registeredHandlers.ContainsKey");
+            if(_registeredHandlers.ContainsKey(messageType))
                 _registeredHandlers[messageType](message);
-            }
     }
 
     public void RegisterHandler(short messageType, SteamNetworkMessageDelegate method) {
@@ -51,7 +64,7 @@ public class SteamPlayer {
 
     public virtual bool SendData(byte[] bytes, int byteCount, EP2PSend sendType, int channelId, out byte error) {
         if(_steamId == SteamUser.GetSteamID()) {
-            ReceiveData(bytes, byteCount, channelId);
+            ReceiveData(_steamId, bytes, byteCount, channelId);
             error = 0;
             return true;
         }

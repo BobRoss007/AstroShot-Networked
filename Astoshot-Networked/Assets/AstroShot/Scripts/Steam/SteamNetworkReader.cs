@@ -90,4 +90,11 @@ public class SteamNetworkReader {
 
         return new Vector4(x, y, z, w);
     }
+
+    public NetworkID ReadNetworkID() {
+        var creatorId = ReadSteamID();
+        var netId = _reader.ReadUInt32();
+
+        return new NetworkID(creatorId, netId);
+    }
 }

@@ -2,34 +2,39 @@
 using System.Collections.Generic;
 using Steamworks;
 using UnityEngine;
-using UnityEngine.Networking;
 
 public class SteamNetworkManager : MonoBehaviour {
-    public const string GAME_ID = "astroshot-networked";
-    public const string SteamPchKey = "astroshot-game";
+    [Obsolete("Set this variable's value to something else", false)]
+    public const string GAME_ID = "my_game_title";
+
+    [Obsolete("Set this variable's value to something else", false)]
+    public const string SteamPchKey = "my_game_key";
 
     public static SteamNetworkManager Current { get; private set; }
+
+    public static event Action OnConnect;
+    public static event Action OnDisconnect;
 
     static CSteamID _steamLobbyId;
     static Dictionary<CSteamID, SteamPlayer> _steamPlayers;
     static HashSet<CSteamID> _connectedPlayers;
     static Dictionary<string, GameObject> _registeredPrefabs;
-    static Dictionary<uint, GameObject> _spawnedObjects;
+    static Dictionary<NetworkID, GameObject> _spawnedObjects;
     static uint _highestNetId;
     static EP2PSend[] _channels = null;
 
-    bool _inLobby;
+    static bool _inLobby;
 
-    Callback<P2PSessionRequest_t> _steamInviteCallback;
-    Callback<LobbyCreated_t> _lobbyCreated;
-    Callback<LobbyEnter_t> _lobbyEntered;
+    static Callback<P2PSessionRequest_t> _steamInviteCallback;
+    static Callback<LobbyCreated_t> _lobbyCreated;
+    static Callback<LobbyEnter_t> _lobbyEntered;
     //Callback<LobbyDataUpdate_t> _lobbyDataUpdate;
-    Callback<GameLobbyJoinRequested_t> _gameLobbyJoinRequested;
-    Callback<LobbyChatUpdate_t> _lobbyChatUpdate;
-    Callback<P2PSessionRequest_t> _P2PSessionRequested;
-    CallResult<LobbyMatchList_t> _lobbyMatchList;
+    static Callback<GameLobbyJoinRequested_t> _gameLobbyJoinRequested;
+    static Callback<LobbyChatUpdate_t> _lobbyChatUpdate;
+    static Callback<P2PSessionRequest_t> _P2PSessionRequested;
+    static CallResult<LobbyMatchList_t> _lobbyMatchList;
 
-    LobbyData[] _lobbyList = new LobbyData[0];
+    static LobbyData[] _lobbyList = new LobbyData[0];
 
     #region Properties
     public static EP2PSend[] Channels {
@@ -45,7 +50,7 @@ public class SteamNetworkManager : MonoBehaviour {
         private set { _channels = value; }
     }
 
-    public SteamPlayer MyPlayer {
+    public static SteamPlayer MyPlayer {
         get {
             if(!SteamManager.Initialized) return null;
 
@@ -70,7 +75,7 @@ public class SteamNetworkManager : MonoBehaviour {
         get { return _spawnedObjects == null ? 0 : _spawnedObjects.Count; }
     }
 
-    public static Dictionary<uint, GameObject> SpawnedObjects {
+    public static Dictionary<NetworkID, GameObject> SpawnedObjects {
         get { return _spawnedObjects; }
     }
 
@@ -86,11 +91,8 @@ public class SteamNetworkManager : MonoBehaviour {
             return;
         }
 
-        if(_registeredPrefabs == null)
-            _registeredPrefabs = new Dictionary<string, GameObject>();
-
-        if(_spawnedObjects == null)
-            _spawnedObjects = new Dictionary<uint, GameObject>();
+        if(_registeredPrefabs == null) _registeredPrefabs = new Dictionary<string, GameObject>();
+        if(_spawnedObjects == null) _spawnedObjects = new Dictionary<NetworkID, GameObject>();
 
         _steamPlayers = new Dictionary<CSteamID, SteamPlayer>();
         _connectedPlayers = new HashSet<CSteamID>();
@@ -101,83 +103,10 @@ public class SteamNetworkManager : MonoBehaviour {
         InitializeSteamCallbacks();
     }
 
-    SteamPlayer AddPlayer(CSteamID steamId) {
-        if(!steamId.IsValid()) return null;
-
-        if(_connectedPlayers.Add(steamId)) {
-            Debug.LogFormat("Player added Username:{0}", SteamFriends.GetFriendPersonaName(steamId));
-
-            _steamPlayers.Add(steamId, new SteamPlayer(steamId));
-        }
-
-        return _steamPlayers[steamId];
-    }
-
-    void CreateLobby() {
-        SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypePublic, 8);
-    }
-
-    public void CreateP2PConnectionWithPeer(CSteamID peerId) {
-        SteamNetworking.SendP2PPacket(peerId, null, 0, EP2PSend.k_EP2PSendReliable);
-
-        OnPlayerConnected(peerId);
-    }
-
-    public SteamPlayer GetPlayer(CSteamID steamId) {
-        SteamPlayer player;
-
-        _steamPlayers.TryGetValue(steamId, out player);
-
-        return player;
-    }
-
-    public void InitializeSteamCallbacks() {
-        _steamInviteCallback = Callback<P2PSessionRequest_t>.Create(Steam_InviteCallback);
-        _lobbyCreated = Callback<LobbyCreated_t>.Create(Steam_OnLobbyCreated);
-        _lobbyEntered = Callback<LobbyEnter_t>.Create(Steam_OnLobbyEntered);
-        //_lobbyDataUpdate = Callback<LobbyDataUpdate_t>.Create(Steam_OnLobbyDataUpdate);
-        _gameLobbyJoinRequested = Callback<GameLobbyJoinRequested_t>.Create(Steam_OnGameLobbyJoinRequested);
-        _lobbyChatUpdate = Callback<LobbyChatUpdate_t>.Create(Steam_ChatUpdate);
-        _P2PSessionRequested = Callback<P2PSessionRequest_t>.Create(Steam_OnP2PSessionRequested);
-        _lobbyMatchList = CallResult<LobbyMatchList_t>.Create(Steam_OnLobbyMatchList);
-    }
-
-    void InitializePlayerCallbacks(SteamPlayer player) {
-        Debug.Log("InitializePlayerCallbacks");
-
-        player.RegisterHandler(NetMessageType.Spawn, SpawnMessageInternal);
-        //player.RegisterHandler(NetMessageType.SendMessageTest, ReceiveMessageTest);
-    }
-
-    public bool IsMemberInSteamLobby(CSteamID steamUser) {
-        if(SteamManager.Initialized) {
-            int numMembers = SteamMatchmaking.GetNumLobbyMembers(SteamLobbyId);
-
-            for(int i = 0; i < numMembers; i++) {
-                var member = SteamMatchmaking.GetLobbyMemberByIndex(SteamLobbyId, i);
-
-                if(member.m_SteamID == steamUser.m_SteamID)
-                    return true;
-            }
-        }
-
-        return false;
-    }
-
-    void JoinLobby(CSteamID lobbyId) {
-        SteamMatchmaking.JoinLobby(lobbyId);
-    }
-
-    public void LeaveLobby() {
-        if(_steamLobbyId.IsValid())
-            SteamMatchmaking.LeaveLobby(_steamLobbyId);
-
-        _steamLobbyId.Clear();
-        _inLobby = false;
-    }
-
     void OnGUI() {
-        GUILayout.BeginVertical(GUILayout.Width(160));
+        //GUILayout.BeginHorizontal();
+        //{
+        GUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(160));
         {
             if(_steamLobbyId.IsValid()) {
                 if(GUILayout.Button("Leave"))
@@ -194,77 +123,54 @@ public class SteamNetworkManager : MonoBehaviour {
 
             if(GUILayout.Button("Find Matches"))
                 _lobbyMatchList.Set(SteamMatchmaking.RequestLobbyList(), Steam_OnLobbyMatchList);
-
         }
         GUILayout.EndVertical();
 
-        GUILayout.BeginVertical();
-        {
-            for(int i = 0; i < _lobbyList.Length; i++) {
-                var lobbyData = _lobbyList[i];
-
-                GUILayout.BeginVertical();
+        if(_lobbyList.Length > 0) {
+            GUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(300));
+            {
+                GUILayout.BeginHorizontal();
                 {
-                    GUILayout.Label(string.Format("Match ({1}/{2}): {0}", lobbyData.label, SteamMatchmaking.GetNumLobbyMembers(lobbyData.lobbyId), SteamMatchmaking.GetLobbyMemberLimit(lobbyData.lobbyId)));
+                    if(GUILayout.Button("Clear"))
+                        _lobbyList = new LobbyData[0];
 
-                    if(!_steamLobbyId.IsValid())
-                        if(GUILayout.Button("Join"))
-                            JoinLobby(lobbyData.lobbyId);
+                    GUILayout.Label("Matches -");
                 }
-                GUILayout.EndVertical();
+                GUILayout.EndHorizontal();
+
+                for(int i = 0; i < _lobbyList.Length; i++) {
+                    var lobbyData = _lobbyList[i];
+
+                    GUILayout.BeginVertical();
+                    {
+                        GUILayout.Label(string.Format("Match ({1}/{2}): {0}", lobbyData.label, SteamMatchmaking.GetNumLobbyMembers(lobbyData.lobbyId), SteamMatchmaking.GetLobbyMemberLimit(lobbyData.lobbyId)));
+
+                        if(!_steamLobbyId.IsValid())
+                            if(GUILayout.Button("Join"))
+                                JoinLobby(lobbyData.lobbyId);
+                    }
+                    GUILayout.EndVertical();
+                }
             }
+            GUILayout.EndVertical();
         }
-        GUILayout.EndVertical();
-    }
 
-    void ReceiveMessageTest(SteamNetworkMessage message) {
-        Debug.Log("ReceiveMessageTest");
-    }
 
-    void OnPlayerConnected(CSteamID steamId) {
-        AddPlayer(steamId);
-        SyncObjectsToNewPlayer(steamId);
-    }
+        if(_connectedPlayers.Count > 0) {
+            GUILayout.BeginVertical(GUI.skin.box, GUILayout.Width(200));
+            {
+                GUILayout.Label("Players (" + _connectedPlayers.Count + ") -");
 
-    void OnPlayerDisconnected(CSteamID steamId) {
-        //List<uint> removeItems = new List<uint>();
-
-        //foreach(var item in _spawnedObjects) {
-        //    if(_spawnedObjects
+                foreach(var player in _steamPlayers.Values) {
+                    GUILayout.Label(player.Name);
+                    GUILayout.Toggle(player.Ready, "Ready");
+                    GUILayout.Space(10);
+                }
+            }
+            GUILayout.EndVertical();
+        }
         //}
-    }
-
-    //public bool RegisterSpawnedObject(NetworkObjectId id, GameObject gameObject) {
-    //    if(!_networkedObjects.ContainsKey(id)) {
-    //        _networkedObjects.Add(id, gameObject);
-    //        return true;
-    //    }
-
-    //    return false;
-    //}
-
-    //public bool UnregisterSpawnedObject(NetworkObjectId id) {
-    //    return _networkedObjects.Remove(id);
-    //}
-
-    void SyncObjectsToNewPlayer(CSteamID playerSteamId) {
-        foreach(var gameObject in _spawnedObjects.Values) {
-            var networkObject = gameObject.GetComponent<SteamNetworkObject>();
-
-            if(networkObject.HasAuthority) {
-                var writer = SteamNetworkWriter.Create(NetMessageType.Spawn);
-
-                writer.Writer.Write(false); // false = Spawn : true = Unspawn
-                writer.Writer.Write(networkObject.NetId);
-                writer.Writer.Write(networkObject.PrefabId);
-                writer.Write(networkObject.OwnerId);
-                writer.Write(networkObject.transform.position);
-                writer.Write(networkObject.transform.rotation);
-                writer.EndWrite();
-
-                SendWriter(playerSteamId, writer, 0);
-            }
-        }
+        //GUILayout.EndHorizontal();
     }
 
     void Update() {
@@ -295,16 +201,37 @@ public class SteamNetworkManager : MonoBehaviour {
                     SteamPlayer myPlayer;
 
                     if(_steamPlayers.TryGetValue(SteamUser.GetSteamID(), out myPlayer))
-                        myPlayer.ReceiveData(data, Convert.ToInt32(packetSize), channel);
+                        myPlayer.ReceiveData(senderId, data, Convert.ToInt32(packetSize), channel);
                 }
             }
         }
     }
 
-    #region Static
+
+    static SteamPlayer AddPlayer(CSteamID steamId) {
+        if(!steamId.IsValid()) return null;
+
+        if(_connectedPlayers.Add(steamId)) {
+            Debug.LogFormat("Player added Username:{0}", SteamFriends.GetFriendPersonaName(steamId));
+
+            _steamPlayers.Add(steamId, new SteamPlayer(steamId));
+        }
+
+        return _steamPlayers[steamId];
+    }
+
     public static void AssignObjectOwner(SteamNetworkObject networkObject, CSteamID ownerId) {
-        if(networkObject != null)
+        if(networkObject != null) {
             networkObject.OwnerId = ownerId;
+
+            var writer = SteamNetworkWriter.Create(NetMessageType.Owner);
+
+            writer.Write(networkObject.ID);
+            writer.Write(networkObject.OwnerId);
+            writer.EndWrite();
+
+            SendWriterToAll(writer, 0, true);
+        }
         else
             Debug.LogError("AssignObjectOwner - SteamNetworkObject component required", networkObject);
     }
@@ -313,16 +240,145 @@ public class SteamNetworkManager : MonoBehaviour {
         _registeredPrefabs.Clear();
     }
 
-    public static uint GenerateId() {
-        return ++_highestNetId;
+    static void CreateLobby() {
+        SteamMatchmaking.CreateLobby(ELobbyType.k_ELobbyTypePublic, 8);
     }
 
-    public static GameObject GetSpawnedObject(uint netId) {
+    public static void CreateP2PConnectionWithPeer(CSteamID peerId) {
+        SteamNetworking.SendP2PPacket(peerId, null, 0, EP2PSend.k_EP2PSendReliable);
+
+        OnPlayerConnected(peerId);
+    }
+
+    static void FinishObjectSyncMessageInternal(SteamNetworkMessage message) {
+        var senderPlayer = GetPlayer(message.SenderId);
+
+        if(senderPlayer != null) {
+            senderPlayer.ReceivedObjectSync = true;
+
+            foreach(var player in _steamPlayers.Values)
+                if(!player.ReceivedObjectSync) return;
+
+            SetPlayerReady(MyPlayer.SteamId, true);
+        }
+    }
+
+    public static NetworkID GenerateId() {
+        var netId = ++_highestNetId;
+
+        return new NetworkID(SteamUser.GetSteamID(), netId);
+    }
+
+    public static SteamPlayer GetPlayer(CSteamID steamId) {
+        SteamPlayer player;
+
+        _steamPlayers.TryGetValue(steamId, out player);
+
+        return player;
+    }
+
+    public static GameObject GetSpawnedObject(NetworkID id) {
         GameObject gameObject;
 
-        _spawnedObjects.TryGetValue(netId, out gameObject);
+        _spawnedObjects.TryGetValue(id, out gameObject);
 
         return gameObject;
+    }
+
+    public static void InitializeSteamCallbacks() {
+        _steamInviteCallback = Callback<P2PSessionRequest_t>.Create(Steam_InviteCallback);
+        _lobbyCreated = Callback<LobbyCreated_t>.Create(Steam_OnLobbyCreated);
+        _lobbyEntered = Callback<LobbyEnter_t>.Create(Steam_OnLobbyEntered);
+        //_lobbyDataUpdate = Callback<LobbyDataUpdate_t>.Create(Steam_OnLobbyDataUpdate);
+        _gameLobbyJoinRequested = Callback<GameLobbyJoinRequested_t>.Create(Steam_OnGameLobbyJoinRequested);
+        _lobbyChatUpdate = Callback<LobbyChatUpdate_t>.Create(Steam_ChatUpdate);
+        _P2PSessionRequested = Callback<P2PSessionRequest_t>.Create(Steam_OnP2PSessionRequested);
+        _lobbyMatchList = CallResult<LobbyMatchList_t>.Create(Steam_OnLobbyMatchList);
+    }
+
+    static void InitializePlayerCallbacks(SteamPlayer player) {
+        Debug.Log("InitializePlayerCallbacks");
+
+        player.RegisterHandler(NetMessageType.Spawn, SpawnMessageInternal);
+        player.RegisterHandler(NetMessageType.Owner, OwnerMessageInternal);
+        player.RegisterHandler(NetMessageType.FinishObjectSync, FinishObjectSyncMessageInternal);
+        player.RegisterHandler(NetMessageType.Ready, ReadyMessageInternal);
+    }
+
+    public static bool IsMemberInSteamLobby(CSteamID steamUser) {
+        if(SteamManager.Initialized) {
+            int numMembers = SteamMatchmaking.GetNumLobbyMembers(SteamLobbyId);
+
+            for(int i = 0; i < numMembers; i++) {
+                var member = SteamMatchmaking.GetLobbyMemberByIndex(SteamLobbyId, i);
+
+                if(member.m_SteamID == steamUser.m_SteamID)
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    static void JoinLobby(CSteamID lobbyId) {
+        SteamMatchmaking.JoinLobby(lobbyId);
+    }
+
+    public static void LeaveLobby() {
+        if(_steamLobbyId.IsValid())
+            SteamMatchmaking.LeaveLobby(_steamLobbyId);
+
+        OnPlayerDisconnected(SteamUser.GetSteamID());
+    }
+
+    static void OnPlayerConnected(CSteamID steamId) {
+        var isMe = steamId == SteamUser.GetSteamID();
+
+        AddPlayer(steamId);
+        if(!isMe) SendReady(steamId);
+
+        if(_connectedPlayers.Count > 1)
+            SyncObjectsToNewPlayer(steamId);
+        else
+            SetPlayerReady(MyPlayer.SteamId, true);
+
+        if(isMe)
+            if(OnConnect != null) OnConnect();
+    }
+
+    static void OnPlayerDisconnected(CSteamID steamId) {
+        if(SteamMatchmaking.GetLobbyOwner(SteamLobbyId) == SteamUser.GetSteamID())
+            if(steamId != SteamUser.GetSteamID())
+                RemovePlayerObjects(steamId);
+
+        if(steamId == SteamUser.GetSteamID())
+            if(OnDisconnect != null) OnDisconnect();
+
+        _steamLobbyId.Clear();
+        _connectedPlayers.Clear();
+        _inLobby = false;
+    }
+
+    static void OwnerMessageInternal(SteamNetworkMessage message) {
+        var id = message.NetworkReader.ReadNetworkID();
+        var ownerId = message.NetworkReader.ReadSteamID();
+
+        var gameObject = GetSpawnedObject(id);
+
+        if(gameObject != null) {
+            var networkObject = gameObject.GetComponent<SteamNetworkObject>();
+
+            networkObject.ID = id;
+            networkObject.OwnerId = ownerId;
+        }
+        else Debug.LogErrorFormat("No object found to set creatorId({0}) netId({1})", id.creatorId.ToString(), id.netId);
+    }
+
+    static void ReadyMessageInternal(SteamNetworkMessage message) {
+        var steamId = message.NetworkReader.ReadSteamID();
+        var ready = message.NetworkReader.Reader.ReadBoolean();
+
+        SetPlayerReady(steamId, ready);
     }
 
     public static bool RegisterPrefab(string prefabId, GameObject gameObject) {
@@ -345,6 +401,29 @@ public class SteamNetworkManager : MonoBehaviour {
         return false;
     }
 
+    public static void RemoveAllPlayerObjects() {
+        var list = new List<NetworkID>(_spawnedObjects.Keys);
+
+        foreach(var id in list)
+            Unspawn(id);
+
+        _spawnedObjects.Clear();
+    }
+
+    public static void RemovePlayerObjects(CSteamID steamId) {
+        List<NetworkID> removeItems = new List<NetworkID>();
+
+        foreach(var item in _spawnedObjects) {
+            var networkObject = item.Value.GetComponent<SteamNetworkObject>();
+
+            if(networkObject.SteamIdHasAuthority(steamId))
+                removeItems.Add(new NetworkID(networkObject.CreatorId, networkObject.NetId));
+        }
+
+        foreach(var item in removeItems)
+            Unspawn(item);
+    }
+
     public static void SendData(byte[] bytes, EP2PSend sendType, int channelId, CSteamID steamId) {
         Debug.Log("Sending Data To: " + SteamFriends.GetFriendPersonaName(steamId));
 
@@ -365,7 +444,6 @@ public class SteamNetworkManager : MonoBehaviour {
             SendData(bytes, sendType, channelId, steamIds[i]);
     }
 
-
     public static void SendData(byte[] bytes, int channelId, CSteamID steamId) {
         SendData(bytes, _channels[channelId], channelId, steamId);
     }
@@ -378,12 +456,60 @@ public class SteamNetworkManager : MonoBehaviour {
         }
     }
 
+    public static void SendEmpty(short messageType, int channelId, CSteamID steamId) {
+        var writer = SteamNetworkWriter.Create(messageType);
+        writer.EndWrite();
+
+        SendWriter(steamId, writer, channelId);
+    }
+
+    public static void SendEmptyToAll(short messageType, int channelId, bool ignoreSelf = false) {
+        var writer = SteamNetworkWriter.Create(messageType);
+        writer.EndWrite();
+
+        SendWriterToAll(writer, channelId, ignoreSelf);
+    }
+
+    static void SendReady(CSteamID sendToSteamId) {
+        var writer = SteamNetworkWriter.Create(NetMessageType.Ready);
+        writer.Write(SteamUser.GetSteamID());
+        writer.Writer.Write(MyPlayer.Ready);
+        writer.EndWrite();
+
+        SendWriter(sendToSteamId, writer, 0);
+    }
+
     public static void SendWriter(CSteamID steamId, SteamNetworkWriter writer, int channelId) {
         SendData(writer.ToBytes(), channelId, steamId);
     }
 
     public static void SendWriterToAll(SteamNetworkWriter writer, int channelId, bool ignoreSelf = false) {
         SendDataToAll(writer.ToBytes(), channelId, ignoreSelf);
+    }
+
+    public static void SetPlayerReady(CSteamID steamId, bool ready) {
+        if(steamId.IsValid() && !steamId.IsLobby()) {
+            if(steamId == SteamUser.GetSteamID()) {
+                MyPlayer.Ready = true;
+
+                if(_connectedPlayers.Count > 1) {
+                    var writer = SteamNetworkWriter.Create(NetMessageType.Ready);
+                    writer.Write(steamId);
+                    writer.Writer.Write(ready);
+                    writer.EndWrite();
+
+                    SendWriterToAll(writer, 0, true);
+                }
+            }
+            else {
+                var player = GetPlayer(steamId);
+
+                if(player != null)
+                    player.Ready = ready;
+                else
+                    Debug.LogErrorFormat("Player ready could not be set Steam Username({0}) Ready({1})", SteamFriends.GetFriendPersonaName(steamId), ready);
+            }
+        }
     }
 
     public static GameObject Spawn(GameObject gameObject, Vector3 position, Quaternion rotation) {
@@ -410,14 +536,14 @@ public class SteamNetworkManager : MonoBehaviour {
         }
 
         if(_registeredPrefabs.ContainsKey(prefabId)) {
-            var netId = GenerateId();
-            var gameObject = SpawnInternal(prefabId, netId, ownerId, position, rotation);
+            var id = GenerateId();
+            var gameObject = SpawnInternal(prefabId, id, ownerId, position, rotation);
 
             if(_connectedPlayers.Count > 1) {
                 var writer = SteamNetworkWriter.Create(NetMessageType.Spawn);
 
                 writer.Writer.Write(false); // false = Spawn : true = Unspawn
-                writer.Writer.Write(netId);
+                writer.Write(id);
                 writer.Writer.Write(prefabId);
                 writer.Write(ownerId);
                 writer.Write(position);
@@ -434,18 +560,19 @@ public class SteamNetworkManager : MonoBehaviour {
         return null;
     }
 
-    static GameObject SpawnInternal(string prefabId, uint netId, CSteamID ownerId, Vector3 position, Quaternion rotation) {
+    static GameObject SpawnInternal(string prefabId, NetworkID id, CSteamID ownerId, Vector3 position, Quaternion rotation) {
         var gameObject = Instantiate(_registeredPrefabs[prefabId], position, rotation);
         var networkObject = gameObject.GetComponent<SteamNetworkObject>();
 
         networkObject.PrefabId = prefabId;
-        networkObject.NetId = netId;
+        networkObject.ID = id;
 
-        if(_spawnedObjects == null) _spawnedObjects = new Dictionary<uint, GameObject>();
+        if(_spawnedObjects == null) _spawnedObjects = new Dictionary<NetworkID, GameObject>();
 
-        _spawnedObjects.Add(netId, gameObject);
+        _spawnedObjects.Add(id, gameObject);
 
-        AssignObjectOwner(networkObject, ownerId);
+        networkObject.OwnerId = ownerId;
+        //AssignObjectOwner(networkObject, ownerId);
 
         if(networkObject.OnSpawn != null) networkObject.OnSpawn.Invoke();
 
@@ -454,11 +581,10 @@ public class SteamNetworkManager : MonoBehaviour {
 
     static void SpawnMessageInternal(SteamNetworkMessage message) {
         var spawnType = message.NetworkReader.Reader.ReadBoolean();
-
-        var netId = message.NetworkReader.Reader.ReadUInt32();
+        var id = message.NetworkReader.ReadNetworkID();
 
         if(spawnType) {
-            //UnspawnInternal(
+            UnspawnInternal(id);
         }
         else {
             var prefabId = message.NetworkReader.Reader.ReadString();
@@ -466,7 +592,7 @@ public class SteamNetworkManager : MonoBehaviour {
             var position = message.NetworkReader.ReadVector3();
             var rotation = message.NetworkReader.ReadQuaternion();
 
-            SpawnInternal(prefabId, netId, ownerId, position, rotation);
+            SpawnInternal(prefabId, id, ownerId, position, rotation);
         }
     }
 
@@ -480,43 +606,65 @@ public class SteamNetworkManager : MonoBehaviour {
         return Spawn(prefabId, SteamLobbyId, position, rotation);
     }
 
+    static void SyncObjectsToNewPlayer(CSteamID playerSteamId) {
+        foreach(var gameObject in _spawnedObjects.Values) {
+            var networkObject = gameObject.GetComponent<SteamNetworkObject>();
+
+            if(networkObject.HasAuthority) {
+                var writer = SteamNetworkWriter.Create(NetMessageType.Spawn);
+
+                writer.Writer.Write(false); // false = Spawn : true = Unspawn
+                writer.Writer.Write(networkObject.NetId);
+                writer.Writer.Write(networkObject.PrefabId);
+                writer.Write(networkObject.OwnerId);
+                writer.Write(networkObject.transform.position);
+                writer.Write(networkObject.transform.rotation);
+                writer.EndWrite();
+
+                SendWriter(playerSteamId, writer, 0);
+            }
+        }
+
+        SendEmpty(NetMessageType.FinishObjectSync, 0, playerSteamId);
+    }
+
     public static bool UnregisterPrefab(string prefabId) {
         return _registeredPrefabs.Remove(prefabId);
     }
 
-    public static void Unspawn(uint netId) {
-        if(UnspawnInternal(netId))
-            if(_connectedPlayers.Count > 1) {
+    public static void Unspawn(NetworkID id) {
+        if(UnspawnInternal(id))
+            if(_steamLobbyId.IsValid() && _connectedPlayers.Count > 1) {
                 var writer = SteamNetworkWriter.Create(NetMessageType.Spawn);
 
                 writer.Writer.Write(true); // false = Spawn : true = Unspawn
-                writer.Writer.Write(netId);
+                writer.Write(id);
                 writer.EndWrite();
 
                 SendWriterToAll(writer, 0, true);
             }
     }
-    static bool UnspawnInternal(uint netId) {
+
+    static bool UnspawnInternal(NetworkID id) {
         GameObject gameObject;
 
-        if(_spawnedObjects.TryGetValue(netId, out gameObject)) {
+        if(_spawnedObjects.TryGetValue(id, out gameObject)) {
             var unityEvent = gameObject.GetComponent<SteamNetworkObject>().OnUnspawn;
 
             if(unityEvent != null) unityEvent.Invoke();
 
             Destroy(gameObject); // TODO Add special unspawn/spawn methods that you can register. Just like Unet's spawning system
 
-            _spawnedObjects.Remove(netId);
+            _spawnedObjects.Remove(id);
 
             return true;
         }
 
         return false;
     }
-    #endregion
 
     #region Steam Callbacks
-    void Steam_ChatUpdate(LobbyChatUpdate_t callback) {
+    static void Steam_ChatUpdate(LobbyChatUpdate_t callback) {
         Debug.Log("Steam_ChatUpdate");
 
         var userId = new CSteamID(callback.m_ulSteamIDUserChanged);
@@ -543,28 +691,31 @@ public class SteamNetworkManager : MonoBehaviour {
 
                     LeaveLobby();
                 }
+                else {
+                    OnPlayerDisconnected(userId);
+                }
 
                 break;
         }
     }
 
-    void Steam_InviteCallback(P2PSessionRequest_t callback) {
+    static void Steam_InviteCallback(P2PSessionRequest_t callback) {
         Debug.Log("Steam_InviteCallback");
     }
 
-    void Steam_OnGameLobbyJoinRequested(GameLobbyJoinRequested_t callback) {
+    static void Steam_OnGameLobbyJoinRequested(GameLobbyJoinRequested_t callback) {
         Debug.Log("Steam_OnGameLobbyJoinRequested");
     }
 
-    void Steam_OnLobbyCreated(LobbyCreated_t callback) {
+    static void Steam_OnLobbyCreated(LobbyCreated_t callback) {
         Debug.Log("Steam_OnLobbyCreated");
     }
 
-    //void Steam_OnLobbyDataUpdate(LobbyDataUpdate_t callback) {
+    //static void Steam_OnLobbyDataUpdate(LobbyDataUpdate_t callback) {
     //    Debug.Log("Steam_OnLobbyDataUpdate");
     //}
 
-    void Steam_OnLobbyEntered(LobbyEnter_t callback) {
+    static void Steam_OnLobbyEntered(LobbyEnter_t callback) {
         Debug.Log("Steam_OnLobbyEntered");
         var mySteamId = SteamUser.GetSteamID();
 
@@ -595,7 +746,7 @@ public class SteamNetworkManager : MonoBehaviour {
         }
     }
 
-    void Steam_OnLobbyMatchList(LobbyMatchList_t callback, bool bIOFailure) {
+    static void Steam_OnLobbyMatchList(LobbyMatchList_t callback, bool bIOFailure) {
         Debug.Log("Steam_OnLobbyMatchList");
 
         List<LobbyData> list = new List<LobbyData>();
@@ -620,7 +771,7 @@ public class SteamNetworkManager : MonoBehaviour {
         _lobbyList = list.ToArray();
     }
 
-    void Steam_OnP2PSessionRequested(P2PSessionRequest_t callback) {
+    static void Steam_OnP2PSessionRequested(P2PSessionRequest_t callback) {
         Debug.Log("Steam_OnP2PSessionRequested");
         var memberId = callback.m_steamIDRemote;
 

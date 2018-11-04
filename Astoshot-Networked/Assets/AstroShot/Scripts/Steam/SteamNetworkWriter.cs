@@ -66,6 +66,10 @@ public class SteamNetworkWriter {
         _writer.Write(vector.z);
         _writer.Write(vector.w);
     }
+    public void Write(NetworkID id) {
+        Write(id.creatorId);
+        _writer.Write(id.netId);
+    }
 
     public bool SendTo(SteamPlayer player, EP2PSend sendType, int channelId) {
         if(!_streamEnded)

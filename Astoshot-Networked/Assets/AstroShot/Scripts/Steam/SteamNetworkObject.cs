@@ -12,30 +12,25 @@ public class SteamNetworkObject : MonoBehaviour {
     UnityEvent _onUnspawn;
 
     string _prefabId;
-    uint _netId;
     CSteamID _ownerId;
-
-    void OnEnable() {
-        if(!SteamNetworkManager.SteamLobbyId.IsValid())
-            gameObject.SetActive(false);
-    }
+    NetworkID _id;
 
     #region Properties
+    public CSteamID CreatorId {
+        get { return ID.creatorId; }
+    }
+
     public bool HasAuthority {
-        get {
-            if(!_ownerId.IsValid()) return false;
-            else {
-                if(OwnedByLobby)
-                    return SteamMatchmaking.GetLobbyOwner(SteamNetworkManager.SteamLobbyId) == SteamUser.GetSteamID();
-                else
-                    return _ownerId == SteamUser.GetSteamID();
-            }
-        }
+        get { return SteamIdHasAuthority(SteamUser.GetSteamID()); }
+    }
+
+    public NetworkID ID {
+        get { return _id; }
+        set { _id = value; }
     }
 
     public uint NetId {
-        get { return _netId; }
-        set { _netId = value; }
+        get { return ID.netId; }
     }
 
     public UnityEvent OnSpawn {
@@ -60,4 +55,19 @@ public class SteamNetworkObject : MonoBehaviour {
         set { _prefabId = value; }
     }
     #endregion
+
+    void OnEnable() {
+        if(!SteamNetworkManager.SteamLobbyId.IsValid())
+            gameObject.SetActive(false);
+    }
+
+    public bool SteamIdHasAuthority(CSteamID steamId) {
+        if(!_ownerId.IsValid()) return false;
+        else {
+            if(OwnedByLobby)
+                return SteamMatchmaking.GetLobbyOwner(SteamNetworkManager.SteamLobbyId) == steamId;
+            else
+                return _ownerId == steamId;
+        }
+    }
 }
