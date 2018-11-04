@@ -684,21 +684,11 @@ public class SteamNetworkManager : MonoBehaviour {
             case (uint)EChatMemberStateChange.k_EChatMemberStateChangeDisconnected:
             case (uint)EChatMemberStateChange.k_EChatMemberStateChangeKicked:
             case (uint)EChatMemberStateChange.k_EChatMemberStateChangeBanned:
-                _connectedPlayers.Remove(userId);
-                _steamPlayers.Remove(userId);
                 Debug.LogFormat("Player left Username:{0}", SteamFriends.GetFriendPersonaName(userId));
 
                 SteamNetworking.CloseP2PSessionWithUser(userId);
 
-                if(userId == SteamUser.GetSteamID()) {
-                    _connectedPlayers.Clear();
-                    _steamPlayers.Clear();
-
-                    LeaveLobby();
-                }
-                else {
-                    OnPlayerDisconnected(userId);
-                }
+                LeaveLobby();
 
                 break;
         }
