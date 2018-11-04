@@ -430,8 +430,6 @@ public class SteamNetworkManager : MonoBehaviour {
     }
 
     public static void SendData(byte[] bytes, EP2PSend sendType, int channelId, CSteamID steamId) {
-        Debug.Log("Sending Data To: " + SteamFriends.GetFriendPersonaName(steamId));
-
         SteamNetworking.SendP2PPacket(steamId, bytes, bytes == null ? 0 : (uint)bytes.Length, sendType, channelId);
     }
     public static void SendData(byte[] bytes, EP2PSend sendType, int channelId, params CSteamID[] steamIds) {
@@ -592,14 +590,14 @@ public class SteamNetworkManager : MonoBehaviour {
             UnspawnInternal(id);
         }
         else {
-            Debug.LogFormat("Reading {0}", "prefabId");
             var prefabId = message.NetworkReader.Reader.ReadString();
-            Debug.LogFormat("Reading {0}", "ownerId");
+            Debug.LogFormat("Read {0}:{1}", "prefabId", prefabId);
             var ownerId = message.NetworkReader.ReadSteamID();
-            Debug.LogFormat("Reading {0}", "position");
+            Debug.LogFormat("Read {0}:{1}", "ownerId", ownerId);
             var position = message.NetworkReader.ReadVector3();
-            Debug.LogFormat("Reading {0}", "rotation");
+            Debug.LogFormat("Read {0}:{1}", "position", position);
             var rotation = message.NetworkReader.ReadQuaternion();
+            Debug.LogFormat("Read {0}:{1}", "rotation", rotation);
 
             SpawnInternal(prefabId, id, ownerId, position, rotation);
         }
