@@ -351,12 +351,13 @@ public class SteamNetworkManager : MonoBehaviour {
             if(steamId != SteamUser.GetSteamID())
                 RemovePlayerObjects(steamId);
 
-        if(steamId == SteamUser.GetSteamID())
+        if(steamId == SteamUser.GetSteamID()) {
             if(OnDisconnect != null) OnDisconnect();
 
-        _steamLobbyId.Clear();
-        _connectedPlayers.Clear();
-        _inLobby = false;
+            _steamLobbyId.Clear();
+            _connectedPlayers.Clear();
+            _inLobby = false;
+        }
     }
 
     static void OwnerMessageInternal(SteamNetworkMessage message) {
